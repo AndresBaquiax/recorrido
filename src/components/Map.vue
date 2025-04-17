@@ -15,7 +15,7 @@
       onMounted(() => {
         //Coordenadas: 14°50'02.0"N 91°31'05.6"W
         const coordenadas = [14.8338889, -91.5182222];
-        const zoom = 17;
+        const zoom = 20;
         // Inicializar el mapa
         const map = L.map('map').setView(coordenadas, zoom); // Latitud, Longitud, Zoom
   

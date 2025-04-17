@@ -4,7 +4,7 @@ const routes = [
   {
     path: '/',
     name: 'Recorridos',
-    component: () => import('../components/MapSanJuanDios.vue'),
+    component: () => import('../components/SanJuanDeDios.vue'),
   }
 ]
 

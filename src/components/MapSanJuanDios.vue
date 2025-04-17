@@ -1,35 +1,31 @@
 <template>
-    <div>
-      <!-- Contenedor del mapa -->
-      <div ref="mapContainer" class="map-container"></div>
-      
-      <!-- Controles -->
-      <div class="map-controls">
-        <div v-if="cargando" class="cargando">Calculando ruta...</div>
-      </div>
-      <div>
-        <button class="control-btn" @click="iniciarAnimacionRecorrido(1)">
-        Iniciar Animación
-        </button>
-      </div>
-    </div>
-  </template>
-  
-  <script>
-  import iconoRuta from '../assets/location.png';
-  import L from 'leaflet';
-  import 'leaflet/dist/leaflet.css';
-  
-  export default {
-    name: 'MapaConRutaCompleto',
-    data() {
-      return {
-        map: null,
-        movilMarker: null,
-        recorridoLayer: null,
-        markers: [],
-        cargando: false,
-        puntosRuta: [
+  <div>
+    <!-- Contenedor del mapa -->
+    <div ref="mapContainer" class="map-container"></div>
+  </div>
+</template>
+
+<script>
+import iconoRuta from '../assets/location.png';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+export default {
+  name: 'MapaConRutaCompleto',
+  data() {
+    return {
+      horaInicio: {
+        horas: 13,
+        minutos: 20,
+        duracionMinutos: 40
+      },
+      zoomInicial: 15,
+      map: null,
+      movilMarker: null,
+      recorridoLayer: null,
+      markers: [],
+      cargando: false,
+      puntosRuta: [
         [14.839750, -91.518056],
         [14.840083, -91.517972],
         [14.840056, -91.517778],
@@ -99,221 +95,268 @@
         [14.839636, -91.518097],
         [14.839750, -91.518056]
 
-        ]
-      };
-    },
-    mounted() {
-      this.inicializarMapa();
-    },
-    methods: {
-        iniciarAnimacionRecorrido(duracionMinutos) {
-        if (this.puntosRuta.length < 2) return;
+      ]
+    };
+  },
+  mounted() {
+    this.inicializarMapa();
+    this.map.setZoom(this.zoomInicial);
+    //this.programarInicio(11, 37, 1); // Hora | Minuto | Duración en minutos
 
-        const duracionTotal = duracionMinutos * 60 * 1000;
-        const totalSegmentos = this.puntosRuta.length - 1;
-        const duracionPorSegmento = duracionTotal / totalSegmentos;
+    const duracionMinutos = this.horaInicio.duracionMinutos;
+    const ahora = new Date();
+    const inicio = new Date();
 
-        // Si ya existe el marcador móvil, lo eliminamos
-        if (this.movilMarker) {
-            this.map.removeLayer(this.movilMarker);
-        }
+    inicio.setHours(this.horaInicio.horas);
+    inicio.setMinutes(this.horaInicio.minutos);
+    inicio.setSeconds(0);
 
-        // Crear icono personalizado
-        const iconoMovil = L.icon({
-            iconUrl: iconoRuta,
-            iconSize: [40, 40],
-            iconAnchor: [20, 20],
-        });
+    const fin = new Date(inicio.getTime() + duracionMinutos * 60000);
 
-        this.movilMarker = L.marker(this.puntosRuta[0], {
-            icon: iconoMovil,
-        }).addTo(this.map);
-
-        let segmentoActual = 0;
-        let inicioSegmento = performance.now();
-
-        const animar = (ahora) => {
-            if (segmentoActual >= totalSegmentos) return;
-
-            const progreso = (ahora - inicioSegmento) / duracionPorSegmento;
-
-            const [lat1, lng1] = this.puntosRuta[segmentoActual];
-            const [lat2, lng2] = this.puntosRuta[segmentoActual + 1];
-
-            const lat = lat1 + (lat2 - lat1) * progreso;
-            const lng = lng1 + (lng2 - lng1) * progreso;
-
-            this.movilMarker.setLatLng([lat, lng]);
-
-            if (progreso >= 1) {
-            segmentoActual++;
-            inicioSegmento = ahora;
-            }
-
-            requestAnimationFrame(animar);
-        };
-
-        requestAnimationFrame(animar);
-        },
-      inicializarMapa() {
-        // Crear mapa centrado en el primer punto
-        this.map = L.map(this.$refs.mapContainer).setView(this.puntosRuta[0], 15);
-        
-        // Añadir capa base de OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(this.map);
-  
-        // Dibujar ruta y marcadores
-        this.dibujarRecorrido();
-        this.iniciarAnimacionRecorrido(2); // 180 minutos = 3 horas
-      },
-  
-      async obtenerRutaOSRM(puntos) {
-        try {
-          this.cargando = true;
-          const coordenadasOSRM = puntos.map(p => `${p[1]},${p[0]}`).join(';');
-          
-          const response = await fetch(
-            `https://router.project-osrm.org/route/v1/bike/${coordenadasOSRM}?overview=full&geometries=geojson`
-          );
-          
-          if (!response.ok) throw new Error('Error al obtener la ruta');
-          
-          const data = await response.json();
-          return data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
-        } catch (error) {
-          console.error("Error al calcular la ruta:", error);
-          return puntos; // Fallback a línea recta
-        } finally {
-          this.cargando = false;
-        }
-      },
-  
-      dibujarRecorrido() {
-        this.limpiarCapas();
-
-        if (this.puntosRuta.length < 2) return;
-
-        const tramo1 = this.puntosRuta.slice(0, 54);
-        const tramo2 = this.puntosRuta.slice(53); 
-
-        // Dibujar el primer tramo (rojo)
-        const layer1 = L.polyline(tramo1, {
-            color: 'red',
-            weight: 6,
-            opacity: 0.8
-        }).addTo(this.map);
-
-        // Dibujar el segundo tramo (azul)
-        const layer2 = L.polyline(tramo2, {
-            color: 'blue',
-            weight: 6,
-            opacity: 0.8
-        }).addTo(this.map);
-
-        this.recorridoLayer = [layer1, layer2]; // guardar ambos por si quieres limpiarlos después
-
-        // Agregar marcadores
-        this.agregarMarcadores();
-
-        // Ajustar vista
-        const bounds = L.latLngBounds(this.puntosRuta);
-        this.map.fitBounds(bounds);
-        },
-  
-      agregarMarcadores() {
-        // Limpiar marcadores antiguos
-        this.markers.forEach(marker => this.map.removeLayer(marker));
-        this.markers = [];
-  
-        // Añadir nuevos marcadores
-        this.puntosRuta.forEach((punto, index) => {
-          const marker = L.marker(punto, {
-            icon: L.divIcon({
-              className: `map-marker marker-${index}`,
-              html: `<span>${index + 1}</span>`,
-              iconSize: [30, 30]
-            })
-          })
-          
-          this.markers.push(marker);
-        });
-      },
-  
-      limpiarCapas() {
-        if (Array.isArray(this.recorridoLayer)) {
-            this.recorridoLayer.forEach(layer => this.map.removeLayer(layer));
-        } else if (this.recorridoLayer) {
-            this.map.removeLayer(this.recorridoLayer);
-        }
-        this.recorridoLayer = null;
-
-        this.markers.forEach(marker => this.map.removeLayer(marker));
-        this.markers = [];
-      },
-  
-      establecerPuntosRuta(nuevosPuntos) {
-        this.puntosRuta = nuevosPuntos;
-        this.dibujarRecorrido();
-      }
+    if (ahora < inicio) {
+      // Todavía no inicia
+      const msHastaInicio = inicio - ahora;
+      console.log(`Inicia en ${msHastaInicio / 1000} segundos`);
+      setTimeout(() => {
+        this.iniciarAnimacionRecorrido(duracionMinutos);
+      }, msHastaInicio);
+    } else if (ahora >= inicio && ahora <= fin) {
+      // Ya está en curso
+      const msTranscurridos = ahora - inicio;
+      this.iniciarAnimacionRecorrido(duracionMinutos, msTranscurridos);
+    } else {
+      console.log('La animación ya terminó.');
     }
-  };
-  </script>
-  
-  <style>
-  .map-container {
-    height: 100vh;
-    width: 100%;
+  },
+  methods: {
+    programarInicio(hora, minuto, duracionMinutos) {
+      const ahora = new Date();
+      const inicio = new Date();
+
+      inicio.setHours(hora);
+      inicio.setMinutes(minuto);
+      inicio.setSeconds(0);
+
+      if (inicio < ahora) {
+        inicio.setDate(inicio.getDate() + 1); // Si ya pasó, programa para mañana
+      }
+
+      const msHastaInicio = inicio - ahora;
+
+      console.log(`Iniciando animación en ${msHastaInicio / 1000} segundos...`);
+
+      setTimeout(() => {
+        this.iniciarAnimacionRecorrido(duracionMinutos);
+      }, msHastaInicio);
+    },
+    iniciarAnimacionRecorrido(duracionMinutos, msTranscurridos = 0) {
+      if (this.puntosRuta.length < 2) return;
+
+      const duracionTotal = duracionMinutos * 60 * 1000;
+      const totalSegmentos = this.puntosRuta.length - 1;
+      const duracionPorSegmento = duracionTotal / totalSegmentos;
+
+      if (this.movilMarker) {
+        this.map.removeLayer(this.movilMarker);
+      }
+
+      const iconoMovil = L.icon({
+        iconUrl: iconoRuta,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+      });
+
+      this.movilMarker = L.marker(this.puntosRuta[0], {
+        icon: iconoMovil,
+      }).addTo(this.map);
+
+      let segmentoActual = Math.floor(msTranscurridos / duracionPorSegmento);
+      let tiempoOffset = msTranscurridos % duracionPorSegmento;
+      let inicioSegmento = performance.now() - tiempoOffset;
+
+      const intervalo = setInterval(() => {
+        const ahora = Date.now();
+
+        if (segmentoActual >= totalSegmentos) {
+          clearInterval(intervalo);
+          return;
+        }
+
+        const progreso = (ahora - inicioSegmento) / duracionPorSegmento;
+
+        const [lat1, lng1] = this.puntosRuta[segmentoActual];
+        const [lat2, lng2] = this.puntosRuta[segmentoActual + 1];
+
+        const lat = lat1 + (lat2 - lat1) * progreso;
+        const lng = lng1 + (lng2 - lng1) * progreso;
+
+        this.movilMarker.setLatLng([lat, lng]);
+
+        if (progreso >= 1) {
+          segmentoActual++;
+          inicioSegmento = ahora;
+        }
+      }, 1000 / 60);
+    },
+    inicializarMapa() {
+      // Crear mapa centrado en el primer punto
+      this.map = L.map(this.$refs.mapContainer).setView(this.puntosRuta[0], this.zoomInicial);
+
+      // Añadir capa base de OpenStreetMap
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(this.map);
+
+      // Dibujar ruta y marcadores
+      this.dibujarRecorrido();
+      //this.iniciarAnimacionRecorrido(2); 
+
+    },
+
+    async obtenerRutaOSRM(puntos) {
+      try {
+        this.cargando = true;
+        const coordenadasOSRM = puntos.map(p => `${p[1]},${p[0]}`).join(';');
+
+        const response = await fetch(
+          `https://router.project-osrm.org/route/v1/bike/${coordenadasOSRM}?overview=full&geometries=geojson`
+        );
+
+        if (!response.ok) throw new Error('Error al obtener la ruta');
+
+        const data = await response.json();
+        return data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+      } catch (error) {
+        console.error("Error al calcular la ruta:", error);
+        return puntos; 
+      } finally {
+        this.cargando = false;
+      }
+    },
+
+    dibujarRecorrido() {
+      this.limpiarCapas();
+
+      if (this.puntosRuta.length < 2) return;
+
+      const tramo1 = this.puntosRuta.slice(0, 54);
+      const tramo2 = this.puntosRuta.slice(53);
+
+      // Dibujar el primer tramo (rojo)
+      const layer1 = L.polyline(tramo1, {
+        color: 'red',
+        weight: 6,
+        opacity: 0.8
+      }).addTo(this.map);
+
+      // Dibujar el segundo tramo (azul)
+      const layer2 = L.polyline(tramo2, {
+        color: 'blue',
+        weight: 6,
+        opacity: 0.8
+      }).addTo(this.map);
+
+      this.recorridoLayer = [layer1, layer2];
+
+      this.agregarMarcadores();
+
+      // Ajustar vista
+      const bounds = L.latLngBounds(this.puntosRuta);
+      this.map.fitBounds(bounds);
+    },
+
+    agregarMarcadores() {
+      // Limpiar marcadores antiguos
+      this.markers.forEach(marker => this.map.removeLayer(marker));
+      this.markers = [];
+
+      // Añadir nuevos marcadores
+      this.puntosRuta.forEach((punto, index) => {
+        const marker = L.marker(punto, {
+          icon: L.divIcon({
+            className: `map-marker marker-${index}`,
+            html: `<span>${index + 1}</span>`,
+            iconSize: [30, 30]
+          })
+        })
+
+        this.markers.push(marker);
+      });
+    },
+
+    limpiarCapas() {
+      if (Array.isArray(this.recorridoLayer)) {
+        this.recorridoLayer.forEach(layer => this.map.removeLayer(layer));
+      } else if (this.recorridoLayer) {
+        this.map.removeLayer(this.recorridoLayer);
+      }
+      this.recorridoLayer = null;
+
+      this.markers.forEach(marker => this.map.removeLayer(marker));
+      this.markers = [];
+    },
+
+    establecerPuntosRuta(nuevosPuntos) {
+      this.puntosRuta = nuevosPuntos;
+      this.dibujarRecorrido();
+    }
   }
-  
-  .ruta-destacada {
-    filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.7));
-    stroke-linecap: round;
-  }
-  
-  .map-controls {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .control-btn {
-    padding: 8px 16px;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  }
-  
-  .control-btn:hover {
-    background: #f0f0f0;
-  }
-  
-  .cargando {
-    padding: 8px 16px;
-    background: white;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-  }
-  
-  .map-marker {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #ff0000;
-    color: white;
-    border-radius: 50%;
-    font-weight: bold;
-  }
-  
-  .map-marker span {
-    position: relative;
-    top: -1px;
-  }
-  </style>
+};
+</script>
+
+<style>
+.map-container {
+  height: 100vh;
+  width: 100%;
+}
+
+.ruta-destacada {
+  filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.7));
+  stroke-linecap: round;
+}
+
+.map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.control-btn {
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.control-btn:hover {
+  background: #f0f0f0;
+}
+
+.cargando {
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.map-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff0000;
+  color: white;
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+.map-marker span {
+  position: relative;
+  top: -1px;
+}
+</style>
