@@ -106,7 +106,7 @@
       this.inicializarMapa();
     },
     methods: {
-        iniciarAnimacionRecorrido(duracionMinutos = 2) {
+        iniciarAnimacionRecorrido(duracionMinutos) {
         if (this.puntosRuta.length < 2) return;
 
         const duracionTotal = duracionMinutos * 60 * 1000;
@@ -166,7 +166,7 @@
   
         // Dibujar ruta y marcadores
         this.dibujarRecorrido();
-        this.iniciarAnimacionRecorrido(180); // 180 minutos = 3 horas
+        this.iniciarAnimacionRecorrido(2); // 180 minutos = 3 horas
       },
   
       async obtenerRutaOSRM(puntos) {
