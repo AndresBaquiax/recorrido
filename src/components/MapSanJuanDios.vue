@@ -106,7 +106,7 @@
       this.inicializarMapa();
     },
     methods: {
-        iniciarAnimacionRecorrido(duracionMinutos) {
+        iniciarAnimacionRecorrido(duracionMinutos = 2) {
         if (this.puntosRuta.length < 2) return;
 
         const duracionTotal = duracionMinutos * 60 * 1000;
