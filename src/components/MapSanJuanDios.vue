@@ -15,9 +15,9 @@ export default {
   data() {
     return {
       horaInicio: {
-        horas: 13,
-        minutos: 20,
-        duracionMinutos: 40
+        horas: 7,
+        minutos: 0,
+        duracionMinutos: 430
       },
       zoomInicial: 15,
       map: null,
